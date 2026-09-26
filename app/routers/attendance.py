@@ -1,13 +1,12 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
 from app.models.models import Attendance
 from app.schemas.schemas import AttendanceCreate
 from app.services.gps import is_inside_school
-
 from app.core.security import verify_token
 
 router = APIRouter(
@@ -16,19 +15,39 @@ router = APIRouter(
 )
 
 
+# ===========================
+# MARK ATTENDANCE
+# ===========================
+
 @router.post("/mark")
-def mark_attendance(
+async def mark_attendance(
+    request: Request,
     data: AttendanceCreate,
-    token: str,
     db: Session = Depends(get_db),
 ):
+
+    auth = request.headers.get("Authorization")
+
+    if auth is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization Header Missing",
+        )
+
+    if not auth.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Authorization Header",
+        )
+
+    token = auth.replace("Bearer ", "")
 
     payload = verify_token(token)
 
     if payload is None:
         raise HTTPException(
             status_code=401,
-            detail="Invalid Token"
+            detail="Invalid Token",
         )
 
     teacher_id = payload["teacher_id"]
@@ -58,7 +77,7 @@ def mark_attendance(
     attendance = Attendance(
         teacher_id=teacher_id,
         attendance_date=date.today(),
-        check_in=datetime.utcnow(),
+        check_in=datetime.utcnow() + timedelta(hours=5, minutes=30),
         latitude=data.latitude,
         longitude=data.longitude,
         status="Present",
@@ -71,3 +90,66 @@ def mark_attendance(
         "message": "Attendance Marked Successfully",
         "teacher_id": teacher_id,
     }
+
+
+# ===========================
+# ATTENDANCE HISTORY
+# ===========================
+
+@router.get("/history")
+async def attendance_history(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+
+    auth = request.headers.get("Authorization")
+
+    if auth is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization Header Missing",
+        )
+
+    if not auth.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Authorization Header",
+        )
+
+    token = auth.replace("Bearer ", "")
+
+    payload = verify_token(token)
+
+    if payload is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Token",
+        )
+
+    teacher_id = payload["teacher_id"]
+
+    attendance = (
+        db.query(Attendance)
+        .filter(Attendance.teacher_id == teacher_id)
+        .order_by(Attendance.attendance_date.desc())
+        .all()
+    )
+
+    history = []
+
+    for record in attendance:
+        history.append(
+            {
+                "date": str(record.attendance_date),
+                "check_in": (
+                    record.check_in.strftime("%I:%M %p")
+                    if record.check_in
+                    else "-"
+                ),
+                "status": record.status,
+                "latitude": record.latitude,
+                "longitude": record.longitude,
+            }
+        )
+
+    return history

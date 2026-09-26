@@ -1,27 +1,19 @@
 from geopy.distance import geodesic
 
-from app.core.config import (
-    SCHOOL_LAT,
-    SCHOOL_LON,
-    SCHOOL_RADIUS,
-)
+# Your School Coordinates
+SCHOOL_LAT = 22.573052
+SCHOOL_LON = 88.435632
+
+# Allowed distance in meters
+RADIUS = 100
 
 
-def is_inside_school(latitude: float, longitude: float):
+def is_inside_school(latitude, longitude):
+    school = (SCHOOL_LAT, SCHOOL_LON)
+    teacher = (latitude, longitude)
 
-    school_location = (
-        SCHOOL_LAT,
-        SCHOOL_LON,
-    )
+    distance = geodesic(school, teacher).meters
 
-    teacher_location = (
-        latitude,
-        longitude,
-    )
+    print(f"Distance from school: {distance:.2f} meters")
 
-    distance = geodesic(
-        school_location,
-        teacher_location,
-    ).meters
-
-    return distance <= SCHOOL_RADIUS
+    return distance <= RADIUS

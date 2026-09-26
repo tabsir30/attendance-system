@@ -3,7 +3,6 @@ import uuid
 
 from deepface import DeepFace
 
-
 UPLOAD_FOLDER = "uploads/faces"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -31,7 +30,7 @@ def verify_face(
 
     temp_image = os.path.join(
         UPLOAD_FOLDER,
-        "temp_verify.jpg"
+        "temp_verify.jpg",
     )
 
     with open(temp_image, "wb") as file:
@@ -42,13 +41,19 @@ def verify_face(
         result = DeepFace.verify(
             img1_path=registered_image,
             img2_path=temp_image,
-            model_name="Facenet512",
-            detector_backend="retinaface",
-            enforce_detection=True,
+
+            # Faster model
+            model_name="Facenet",
+
+            # Faster detector
+            detector_backend="opencv",
+
+            # Avoid detection failure
+            enforce_detection=False,
         )
 
         return {
-            "matched": bool(result["verified"]),
+            "verified": bool(result["verified"]),
             "distance": float(result["distance"]),
             "threshold": float(result["threshold"]),
         }
